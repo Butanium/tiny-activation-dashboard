@@ -14,7 +14,7 @@ def parse_list_str(s: str) -> list[int]:
 
 
 def apply_chat(
-    text: str, tokenizer, add_bos: bool = True, enable_thinking: bool = False
+    text: str, tokenizer, add_bos: bool = True, enable_thinking: bool = None
 ) -> str:
     """Apply chat formatting to text using the tokenizer"""
     splitted = text.split("<eot>")
@@ -29,7 +29,7 @@ def apply_chat(
     len_bos = len(tokenizer.bos_token) if tokenizer.bos_token is not None else 0
     # Check if tokenizer supports enable_thinking parameter
     apply_chat_params = {"tokenize": False, "add_generation_prompt": True}
-    if "enable_thinking" in inspect.signature(tokenizer.apply_chat_template).parameters:
+    if enable_thinking is not None:
         apply_chat_params["enable_thinking"] = enable_thinking
     formated_chat = tokenizer.apply_chat_template(chat, **apply_chat_params)[
         0 if add_bos else len_bos :
