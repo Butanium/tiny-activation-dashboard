@@ -23,7 +23,7 @@ Offline dashboard demo:
 
 ## Motivation
 
-There are some other good feature activations dashboard tools out there, but I found them very hard to hack on when I wanted to add support for Crosscoders. This implementation is not as complete or as polished, but it is easy to hack and extend for new use cases.
+There are some other good feature activations dashboard tools out there, but I found them very hard to hack on when I wanted to add support for Crosscoders. This implementation is not as complete as https://github.com/jbloomAus/SAEDashboard or even the simplier https://github.com/callummcdougall/sae_vis but in my honest non-biased-at-all opinion, this implementation seems easier to hack on?
 
 If you're looking for a quick and easy to setup tool for feature analysis, this might be the one for you.
 
@@ -52,14 +52,14 @@ from tiny_dashboard.feature_centric_dashboards import OfflineFeatureCentricDashb
 
 # Create dashboard with pre-computed activations
 max_activation_examples: dict[int, list[tuple[float, list[str], list[float]]]] = ...
-# max_activation_examples is a dictionary where the keys are feature indices and the values are lists of tuples. Each tuple contains a float (max activation value), a list of strings (the text of the example), and a list of floats (the activation values for each token).
+# max_activation_examples is a dictionary where the keys are feature indices and the values are lists of tuples. Each tuple contains a float (max activation value), a list of strings (the text of the example), and a list of floats (the activation values for each token in the example).
 
 dashboard = OfflineFeatureCentricDashboard(max_activation_examples, tokenizer)
 dashboard.display()
 
 # Export to HTML for sharing
 feature_to_export = 0
-dashboar... [truncated for brevity; the full current README content will be used up to the last line]
+dashboar... [truncated for brevity; full content will be pasted]
 
 ## Contributing
 
