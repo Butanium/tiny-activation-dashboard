@@ -25,9 +25,10 @@ from .html_utils import (
     create_token_html,
     create_highlighted_tokens_html,
 )
+from .base_servable_dashboard import BaseServableDashboard
 
 
-class OfflineFeatureCentricDashboard:
+class OfflineFeatureCentricDashboard(BaseServableDashboard):
     """
     This Dashboard is composed of a feature selector and a feature viewer.
     The feature selector allows you to select a feature and view the max activating examples for that feature.
@@ -226,8 +227,161 @@ class OfflineFeatureCentricDashboard:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(html_content)
 
+    def get_initial_html(self) -> str:
+        """Generate the initial HTML page with feature selection form"""
+        available_features_str = ", ".join(map(str, self.available_features[:20]))
+        if len(self.available_features) > 20:
+            available_features_str += "..."
 
-class AbstractOnlineFeatureCentricDashboard(ABC):
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Offline Feature Dashboard</title>
+            <style>
+                body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    max-width: 800px;
+                    margin: 40px auto;
+                    padding: 20px;
+                    background: #f5f5f5;
+                }}
+                .container {{
+                    background: white;
+                    padding: 30px;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                }}
+                h1 {{
+                    margin-top: 0;
+                    color: #333;
+                }}
+                .form-group {{
+                    margin-bottom: 20px;
+                }}
+                label {{
+                    display: block;
+                    margin-bottom: 5px;
+                    font-weight: 500;
+                    color: #555;
+                }}
+                input[type="text"], input[type="number"] {{
+                    width: 100%;
+                    padding: 10px;
+                    border: 1px solid #ddd;
+                    border-radius: 4px;
+                    font-size: 14px;
+                    box-sizing: border-box;
+                }}
+                input[type="checkbox"] {{
+                    margin-right: 8px;
+                }}
+                button {{
+                    background: #007bff;
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 4px;
+                    font-size: 14px;
+                    cursor: pointer;
+                    font-weight: 500;
+                }}
+                button:hover {{
+                    background: #0056b3;
+                }}
+                .info {{
+                    background: #e7f3ff;
+                    padding: 12px;
+                    border-radius: 4px;
+                    margin-bottom: 20px;
+                    color: #004085;
+                    font-size: 14px;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Offline Feature Dashboard</h1>
+                <div class="info">
+                    Available features: {available_features_str}
+                    <br>Total features: {len(self.available_features)}
+                </div>
+                <form method="POST" action="/analyze">
+                    <div class="form-group">
+                        <label for="feature_idx">Feature Index:</label>
+                        <input type="number" id="feature_idx" name="feature_idx" required
+                               placeholder="Enter feature number...">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="use_absolute_max" value="true">
+                            Use Absolute Max
+                        </label>
+                    </div>
+                    <button type="submit">View Examples</button>
+                </form>
+            </div>
+        </body>
+        </html>
+        """
+
+    def handle_request(self, form_data: dict) -> str:
+        """Process form submission and generate feature examples HTML"""
+        try:
+            feature_idx = int(form_data.get("feature_idx", 0))
+            use_absolute_max = form_data.get("use_absolute_max") == "true"
+
+            if feature_idx not in self.max_activation_examples:
+                return f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Error</title>
+                    <style>
+                        body {{ font-family: sans-serif; padding: 20px; }}
+                        .error {{ color: red; background: #fee; padding: 15px; border-radius: 5px; }}
+                    </style>
+                </head>
+                <body>
+                    <div class="error">
+                        Feature {feature_idx} not found. Available features: {self.available_features}
+                    </div>
+                    <a href="/">Go Back</a>
+                </body>
+                </html>
+                """
+
+            # Generate the HTML using existing method
+            html_content = self.generate_html(feature_idx, use_absolute_max)
+
+            # Add a back button
+            html_with_nav = html_content.replace(
+                "</body>",
+                '<div style="margin: 20px; text-align: center;"><a href="/" style="color: #007bff; text-decoration: none; font-size: 16px;">← Back to Feature Selection</a></div></body>'
+            )
+
+            return html_with_nav
+
+        except ValueError as e:
+            return f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Error</title>
+                <style>
+                    body {{ font-family: sans-serif; padding: 20px; }}
+                    .error {{ color: red; }}
+                </style>
+            </head>
+            <body>
+                <div class="error">Invalid feature index: {str(e)}</div>
+                <a href="/">Go Back</a>
+            </body>
+            </html>
+            """
+
+
+class AbstractOnlineFeatureCentricDashboard(BaseServableDashboard):
     """
     Abstract base class for real-time feature analysis dashboards.
     Users can input text, select a feature, and see the activation patterns
@@ -596,6 +750,262 @@ class AbstractOnlineFeatureCentricDashboard(ABC):
             ),  # Allow overflow to be visible
         )
         display(dashboard)
+
+    def get_initial_html(self) -> str:
+        """Generate the initial HTML page with analysis form"""
+        model_info = "Model response generation available" if self.model is not None else "No model loaded"
+
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Online Feature Dashboard</title>
+            <style>
+                body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    max-width: 1000px;
+                    margin: 40px auto;
+                    padding: 20px;
+                    background: #f5f5f5;
+                }}
+                .container {{
+                    background: white;
+                    padding: 30px;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                }}
+                h1 {{
+                    margin-top: 0;
+                    color: #333;
+                }}
+                .form-group {{
+                    margin-bottom: 20px;
+                }}
+                label {{
+                    display: block;
+                    margin-bottom: 5px;
+                    font-weight: 500;
+                    color: #555;
+                }}
+                input[type="text"], textarea {{
+                    width: 100%;
+                    padding: 10px;
+                    border: 1px solid #ddd;
+                    border-radius: 4px;
+                    font-size: 14px;
+                    box-sizing: border-box;
+                    font-family: monospace;
+                }}
+                textarea {{
+                    min-height: 150px;
+                    resize: vertical;
+                }}
+                input[type="checkbox"] {{
+                    margin-right: 8px;
+                }}
+                button {{
+                    background: #007bff;
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 4px;
+                    font-size: 14px;
+                    cursor: pointer;
+                    font-weight: 500;
+                }}
+                button:hover {{
+                    background: #0056b3;
+                }}
+                .info {{
+                    background: #e7f3ff;
+                    padding: 12px;
+                    border-radius: 4px;
+                    margin-bottom: 20px;
+                    color: #004085;
+                    font-size: 14px;
+                }}
+                .checkbox-group {{
+                    margin-top: 10px;
+                }}
+                .form-row {{
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 15px;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Online Feature Dashboard</h1>
+                <div class="info">{model_info}</div>
+                <form method="POST" action="/analyze">
+                    <div class="form-group">
+                        <label for="text_input">Text to Analyze:</label>
+                        <textarea id="text_input" name="text_input" required
+                                  placeholder="Enter text to analyze..."></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="feature_input">Features to Compute (e.g., [1,2,3]):</label>
+                            <input type="text" id="feature_input" name="feature_input"
+                                   placeholder="[1,2,3]" value="[]">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="highlight_feature">Highlight Features (1-2):</label>
+                            <input type="text" id="highlight_feature" name="highlight_feature"
+                                   placeholder="1 or 1,2" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="tooltip_features">Tooltip Features:</label>
+                            <input type="text" id="tooltip_features" name="tooltip_features"
+                                   placeholder="1,2,3" value="">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="min_max_act">Max Activation (empty, 'auto', or float):</label>
+                            <input type="text" id="min_max_act" name="min_max_act"
+                                   placeholder="auto" value="">
+                        </div>
+                    </div>
+
+                    <div class="checkbox-group">
+                        <label>
+                            <input type="checkbox" name="chat_formatting" value="true">
+                            Use Chat Formatting
+                        </label>
+                        <label>
+                            <input type="checkbox" name="generate_response" value="true"
+                                   {"disabled" if self.model is None else ""}>
+                            Generate Response
+                        </label>
+                    </div>
+
+                    <button type="submit">Analyze</button>
+                </form>
+            </div>
+        </body>
+        </html>
+        """
+
+    def handle_request(self, form_data: dict) -> str:
+        """Process form submission and generate analysis HTML"""
+        try:
+            # Extract form data
+            text = form_data.get("text_input", "").strip()
+            if not text:
+                raise ValueError("No text provided")
+
+            # Parse feature inputs
+            feature_input_str = form_data.get("feature_input", "[]").strip()
+            feature_indices = parse_list_str(feature_input_str) if feature_input_str else []
+
+            highlight_feature_str = form_data.get("highlight_feature", "").strip()
+            highlight_features = parse_list_str(highlight_feature_str)
+            if len(highlight_features) not in (1, 2):
+                raise ValueError("Please enter one or two features to highlight")
+
+            tooltip_features_str = form_data.get("tooltip_features", "").strip()
+            tooltip_features = parse_list_str(tooltip_features_str) if tooltip_features_str else []
+
+            # Ensure all required features are computed
+            feature_indices = list(
+                dict.fromkeys(highlight_features + tooltip_features + feature_indices)
+            )
+
+            # Handle options
+            chat_formatting = form_data.get("chat_formatting") == "true"
+            generate_response = form_data.get("generate_response") == "true"
+            min_max_act_value = form_data.get("min_max_act", "").strip().lower()
+
+            # Process text
+            if chat_formatting:
+                text = apply_chat(text, self.tokenizer, add_bos=False)
+
+            if generate_response:
+                if self.model is None:
+                    raise ValueError("Cannot generate response: no model loaded")
+                if text.startswith(self.tokenizer.bos_token):
+                    text = text[len(self.tokenizer.bos_token):]
+                text = self.generate_model_response(text)
+
+            # Tokenize and get activations
+            tokens = self.tokenizer.tokenize(text, add_special_tokens=True)
+            activations = self.get_feature_activation(text, tuple(feature_indices))
+
+            if len(tokens) != activations.shape[0]:
+                raise ValueError(
+                    f"Token/activation mismatch: {len(tokens)} tokens vs {activations.shape[0]} activations"
+                )
+
+            # Handle min_max_act
+            min_max_act = None
+            if min_max_act_value and min_max_act_value != "auto":
+                try:
+                    min_max_act = float(min_max_act_value)
+                except ValueError:
+                    raise ValueError("Min-max act must be empty, 'auto' or a float value")
+            elif min_max_act_value == "auto":
+                if self.max_acts is not None and highlight_features[0] in self.max_acts:
+                    min_max_act = self.max_acts[highlight_features[0]]
+                else:
+                    raise ValueError("Cannot use 'auto': no max_acts available")
+
+            # Create HTML visualization (adapted from _create_html_highlight)
+            highlight_positions = [feature_indices.index(f) for f in highlight_features]
+            tooltip_positions = [feature_indices.index(f) for f in tooltip_features]
+            activation_names = [f"Feature {feature_indices[i]}" for i in range(len(feature_indices))]
+
+            html_content, max_acts_str = create_highlighted_tokens_html(
+                tokens=tokens,
+                activations=activations,
+                tokenizer=self.tokenizer,
+                highlight_features=highlight_positions,
+                tooltip_features=tooltip_positions,
+                color1=(255, 0, 0),
+                color2=self.second_highlight_color,
+                activation_names=activation_names,
+                return_max_acts_str=True,
+                min_max_act=min_max_act,
+            )
+
+            example_html = create_example_html(max_acts_str, html_content, static=True)
+            result_html = create_base_html(title="Feature Analysis", content=example_html)
+
+            # Add back button
+            result_with_nav = result_html.replace(
+                "</body>",
+                '<div style="margin: 20px; text-align: center;"><a href="/" style="color: #007bff; text-decoration: none; font-size: 16px;">← Back to Input Form</a></div></body>'
+            )
+
+            return result_with_nav
+
+        except Exception as e:
+            import traceback
+            return f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Error</title>
+                <style>
+                    body {{ font-family: sans-serif; padding: 20px; }}
+                    .error {{ color: red; background: #fee; padding: 15px; border-radius: 5px; margin: 20px 0; }}
+                    pre {{ background: #f5f5f5; padding: 10px; overflow-x: auto; }}
+                </style>
+            </head>
+            <body>
+                <h1>Error Processing Analysis</h1>
+                <div class="error"><strong>Error:</strong> {str(e)}</div>
+                <h2>Traceback:</h2>
+                <pre>{traceback.format_exc()}</pre>
+                <a href="/">Go Back</a>
+            </body>
+            </html>
+            """
 
 
 class OnlineFeatureCentricDashboard(AbstractOnlineFeatureCentricDashboard):

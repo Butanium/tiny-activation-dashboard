@@ -20,7 +20,10 @@ classifiers = [
 ]
 dependencies = [
     "nnterp",
-    "ipywidgets",   
+    "ipywidgets",
+    "fastapi",
+    "uvicorn[standard]",
+    "python-multipart",
 ]
 
 
